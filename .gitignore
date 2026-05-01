@@ -2,3 +2,4 @@
 /exports/*
 /imports/*
 /backups/*
+/config/app_config.json
