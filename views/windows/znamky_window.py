@@ -1,15 +1,8 @@
 from decimal import Decimal, InvalidOperation
 
 from PyQt6.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QMessageBox,
-    QComboBox,
-    QSpinBox,
+    QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QTableWidgetItem, QMessageBox, QComboBox, QSpinBox
 )
 from PyQt6.QtCore import Qt
 
@@ -43,7 +36,6 @@ class ZnamkyWindow(BaseChildWindow):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # --------- FILTRY ----------
         filters = QHBoxLayout()
 
         self.combo_druzstvo = QComboBox()
@@ -71,14 +63,10 @@ class ZnamkyWindow(BaseChildWindow):
         filters.addWidget(self.spin_E)
         filters.addWidget(btn_load)
 
-        # --------- TABULKA ----------
         self.table = EnterTableWidget()
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
+        self.table.setSelectionBehavior(self.table.SelectionBehavior.SelectItems)
         self.table.setAlternatingRowColors(True)
 
-        # --------- TLAČÍTKA ----------
         btn_save = QPushButton("Uložit známky")
         btn_save.clicked.connect(self._save)
 
@@ -88,6 +76,7 @@ class ZnamkyWindow(BaseChildWindow):
 
     def _init_signals(self):
         self.table.itemChanged.connect(self._on_item_changed)
+        self.table.currentCellChanged.connect(self._on_row_leave)
 
     # ---------------------------------------------------------
     # TABULKA
@@ -106,11 +95,10 @@ class ZnamkyWindow(BaseChildWindow):
         self.table.setHorizontalHeaderLabels(headers)
         self.table.setRowCount(0)
         self.table.setColumnHidden(0, True)
-        self.table.horizontalHeader().setStretchLastSection(True)
 
         rows = ZnamkyService.get_zavodnici(
-            druzstvo = self.combo_druzstvo.currentData(),
-            naradi_id = self.combo_naradi.currentData(),
+            druzstvo=self.combo_druzstvo.currentData(),
+            naradi_id=self.combo_naradi.currentData(),
         )
 
         for zavodnik, znamky in rows:
@@ -120,32 +108,20 @@ class ZnamkyWindow(BaseChildWindow):
         row = self.table.rowCount()
         self.table.insertRow(row)
 
-        # ID + jméno (read-only)
         self._set_item(row, 0, z.zavodnik_id, enabled=False)
         self._set_item(row, 1, z.jmeno, enabled=False)
 
-        # E1..En – vždy prázdné
         for i in range(self.pocet_E):
             self._set_item(row, 4 + i, "")
 
-        # znamka D + Srážky E + Výsledná + PEN– pouze z DB
         self._set_item(row, 2, znamky.znamka_D if znamky else "")
-
         self._set_item(row, 3, znamky.pen if znamky else "")
 
-        self._set_item(
-            row,
-            4 + self.pocet_E,
-            znamky.srazky_E if znamky else "",
-            enabled=False,
-        )
+        self._set_item(row, 4 + self.pocet_E,
+                       znamky.srazky_E if znamky else "", enabled=False)
 
-        self._set_item(
-            row,
-            5 + self.pocet_E,
-            znamky.vysledna if znamky else "",
-            enabled=False,
-        )
+        self._set_item(row, 5 + self.pocet_E,
+                       znamky.vysledna if znamky else "", enabled=False)
 
     # ---------------------------------------------------------
     # VÝPOČTY
@@ -159,7 +135,7 @@ class ZnamkyWindow(BaseChildWindow):
         try:
             return Decimal(item.text().replace(",", "."))
         except InvalidOperation:
-            raise ValueError("Neplatná číselná hodnota")
+            raise ValueError("Neplatná hodnota")
 
     def _recalc_row(self, row: int):
         try:
@@ -172,8 +148,7 @@ class ZnamkyWindow(BaseChildWindow):
             ]
 
             srazky_E = ZnamkyService.compute_srazky_E(e_vals)
-            znamka_E = Decimal(10) - srazky_E
-            vysledna = znamka_D - pen + znamka_E
+            vysledna = znamka_D - pen + (Decimal(10) - srazky_E)
 
             self._set_text_safe(row, 4 + self.pocet_E, str(srazky_E))
             self._set_text_safe(row, 5 + self.pocet_E, str(vysledna))
@@ -183,52 +158,73 @@ class ZnamkyWindow(BaseChildWindow):
             self._set_text_safe(row, 5 + self.pocet_E, "")
 
     # ---------------------------------------------------------
-    # ULOŽENÍ
+    # AUTO SAVE
     # ---------------------------------------------------------
-    def _save(self):
+
+    def _on_row_leave(self, row, col, prev_row, prev_col):
+        if prev_row < 0 or row == prev_row:
+            return
+
+        if self._is_row_complete(prev_row):
+            self._save_row(prev_row)
+
+    def _is_row_complete(self, row: int) -> bool:
         try:
-            naradi_id = self.combo_naradi.currentData()
-            if not naradi_id:
-                raise ValueError("Není vybráno nářadí")
+            self._get_decimal(row, 2)
+            self._get_decimal(row, 3)
 
-            items = []
+            for c in range(4, 4 + self.pocet_E):
+                item = self.table.item(row, c)
+                if not item or not item.text().strip():
+                    return False
 
-            for row in range(self.table.rowCount()):
-                zavodnik_id = int(self.table.item(row, 0).text())
+            return True
+        except Exception:
+            return False
 
-                srazky_E_item = self.table.item(row, 4 + self.pocet_E)
-                vysledna_item = self.table.item(row, 5 + self.pocet_E)
+    def _save_row(self, row: int):
+        naradi_id = self.combo_naradi.currentData()
+        if not naradi_id:
+            return
 
-                if not srazky_E_item or not vysledna_item:
-                    continue
+        try:
+            item = {
+                "zavodnik_id": int(self.table.item(row, 0).text()),
+                "naradi_id": naradi_id,
+                "znamka_D": self._get_decimal(row, 2),
+                "pen": self._get_decimal(row, 3),
+                "srazky_E": self._get_decimal(row, 4 + self.pocet_E),
+                "vysledna": self._get_decimal(row, 5 + self.pocet_E),
+            }
 
-                items.append({
-                    "zavodnik_id": zavodnik_id,
-                    "naradi_id": naradi_id,
-                    "znamka_D": self._get_decimal(row, 2),
-                    "pen": self._get_decimal(row, 3),
-                    "srazky_E": self._get_decimal(row, 4 + self.pocet_E),
-                    "vysledna": self._get_decimal(row, 5 + self.pocet_E),
-                })
+            ZnamkyService.save([item])
+            self._mark_row_saved(row)
 
-            ZnamkyService.save(items)
-            QMessageBox.information(self, "OK", "Známky uloženy")
+        except Exception:
+            pass
 
-        except Exception as e:
-            QMessageBox.critical(self, "Chyba", str(e))
+    def _mark_row_saved(self, row):
+        for c in range(self.table.columnCount()):
+            item = self.table.item(row, c)
+            if item:
+                item.setBackground(Qt.GlobalColor.green)
 
     # ---------------------------------------------------------
+    # MANUAL SAVE
+    # ---------------------------------------------------------
 
-    def _set_item(self, row, col, value, enabled=True):
-        item = QTableWidgetItem(str(value))
-        if not enabled:
-            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        self.table.setItem(row, col, item)
+    def _save(self):
+        for row in range(self.table.rowCount()):
+            if self._is_row_complete(row):
+                self._save_row(row)
+
+        QMessageBox.information(self, "OK", "Známky uloženy")
+
+    # ---------------------------------------------------------
 
     def _on_item_changed(self, item: QTableWidgetItem):
         col = item.column()
 
-        # reagujeme jen na D, PEN a E sloupce
         if col < 2 or col >= 4 + self.pocet_E:
             return
 
@@ -238,10 +234,27 @@ class ZnamkyWindow(BaseChildWindow):
         finally:
             self.table.blockSignals(False)
 
-    def _set_text_safe(self, row: int, col: int, value: str):
+    def _set_item(self, row, col, value, enabled=True):
+        item = QTableWidgetItem(str(value))
+        if not enabled:
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        self.table.setItem(row, col, item)
+
+    def _set_text_safe(self, row, col, value):
         item = self.table.item(row, col)
         if item is None:
             item = QTableWidgetItem()
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             self.table.setItem(row, col, item)
         item.setText(value)
+
+    # ---------------------------------------------------------
+    # CLOSE
+    # ---------------------------------------------------------
+
+    def closeEvent(self, event):
+        row = self.table.currentRow()
+        if row >= 0 and self._is_row_complete(row):
+            self._save_row(row)
+
+        super().closeEvent(event)
