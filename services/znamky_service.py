@@ -67,20 +67,20 @@ class ZnamkyService:
         """
         values = [v for v in values if v is not None]
 
-        if not values:
+        if not values or sum(values)==0:
             return Decimal("0")
 
         values = sorted(values)
         n = len(values)
 
         if n <= 3:
-            return round(sum(values) / Decimal(n), 3)
+                return 10-(round(sum(values) / Decimal(n), 3))
 
         if n == 4:
             middle = values[1:3]
-            return round(sum(middle) / Decimal(2), 3)
+            return 10-(round(sum(middle) / Decimal(2), 3))
 
         # n >= 5
         mid = n // 2
         middle = values[mid-1:mid+2]
-        return round(sum(middle) / Decimal(3), 3)
+        return 10-(round(sum(middle) / Decimal(3), 3))

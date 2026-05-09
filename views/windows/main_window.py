@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QPushButton, QWidget, QVBoxLayout, QGri
 
 from pathlib import Path
 from config import Config
+from utils.XlsxFormat import format_numeric_cells
 from views.windows.config_window import ConfigWindow
 from views.windows.naradi_window import NaradiWindow
 from views.windows.import_window import ImportWindow
@@ -95,6 +96,7 @@ class MainWindow(QMainWindow):
 
         vbox_data.addWidget(btn_import)
         vbox_data.addWidget(btn_export)
+
 
         grid_layout.addWidget(group_data, 1, 0)
 
@@ -238,6 +240,9 @@ class MainWindow(QMainWindow):
     def get_gis(self):
         export_dir = Path(self.config.data.get("import_dir"))
         path = export_dir / "SGM Majovy pohar_startovka.xlsx"
+
+        # Přeformátuj zdrojový soubor před exportem
+        format_numeric_cells(str(path))
 
         result = ExportService.export_to_xlsx(str(path))
 

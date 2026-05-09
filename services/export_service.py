@@ -1,9 +1,9 @@
 import shutil
+from decimal import Decimal
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 from services.VysledkyService import VysledkyService
-
 
 class ExportService:
 

@@ -8,3 +8,4 @@ from .backup_window import BackupWindow
 from .rozhodci_window import RozhodciWindow
 from .druzstva_window import DruzstvaWindow
 from .znamky_window import ZnamkyWindow
+from utils.XlsxFormat import format_numeric_cells

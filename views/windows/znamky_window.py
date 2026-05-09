@@ -88,7 +88,7 @@ class ZnamkyWindow(BaseChildWindow):
         headers = (
             self.BASE_HEADERS
             + [f"E{i+1}" for i in range(self.pocet_E)]
-            + ["Srážky E", "Výsledná"]
+            + ["Známka E", "Výsledná"]
         )
 
         self.table.setColumnCount(len(headers))
@@ -148,7 +148,7 @@ class ZnamkyWindow(BaseChildWindow):
             ]
 
             srazky_E = ZnamkyService.compute_srazky_E(e_vals)
-            vysledna = znamka_D - pen + (Decimal(10) - srazky_E)
+            vysledna = znamka_D - pen + srazky_E
 
             self._set_text_safe(row, 4 + self.pocet_E, str(srazky_E))
             self._set_text_safe(row, 5 + self.pocet_E, str(vysledna))
