@@ -1,12 +1,12 @@
 {
     "db_host": "localhost",
     "db_port": 3306,
-    "db_user": "root",
-    "db_password": "tucnak",
+    "db_user": "xxx",
+    "db_password": "xxx",
     "db_name": "majovy_pohar",
-    "backup_dir": "/home/michal/PycharmProjects/MajovyPohar/backups",
-    "export_dir": "/home/michal/PycharmProjects/MajovyPohar/exports",
-    "import_dir": "/home/michal/PycharmProjects/MajovyPohar/imports",
+    "backup_dir": "/backups",
+    "export_dir": "/exports",
+    "import_dir": "/imports",
     "competition_name": "Májový pohár",
     "current_year": 2026,
     "competiton_name": "Májový pohár"
